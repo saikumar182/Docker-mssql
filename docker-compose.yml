@@ -1,0 +1,56 @@
+version: '3.8'
+
+services:
+  mssql:
+    image: javanile/mssql:latest
+    container_name: my-mssql-container
+
+    restart: always
+    environment:
+      ACCEPT_EULA: "Y"
+      SA_PASSWORD: "YourStrong!Passw0rd"
+    ports:
+      - "1422:1433"
+    networks:
+      - my-network
+    healthcheck:
+      test: ["CMD", "/opt/mssql-tools/bin/sqlcmd", "-S", "localhost", "-U", "SA", "-P", "YourStrong!Passw0rd", "-Q", "SELECT 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    volumes:
+      - docker:/var/opt/mssql
+
+  spring-boot-app:
+    build:
+      context: ../DockerApplication
+      dockerfile: Dockerfile
+    image: spring-docker-boot-application-new101
+    container_name: spring-docker-app-new101
+
+    ports:
+      - "8888:8080"
+    depends_on:
+      mssql:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL: "jdbc:sqlserver://mssql:1433;databaseName=student;encrypt=true;trustServerCertificate=true;"
+      SPRING_DATASOURCE_USERNAME: "SA"
+      SPRING_DATASOURCE_PASSWORD: "YourStrong!Passw0rd"
+    networks:
+      - my-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+      start_period: 1m
+      interval: 1m30s
+      timeout: 10s
+      retries: 3
+
+networks:
+  my-network:
+    driver: bridge
+
+volumes:
+  docker:
+    external: true
